@@ -4104,6 +4104,16 @@ static int dwc2_hsotg_ep_enable(struct usb_ep *ep,
 	 */
 	epctrl |= DXEPCTL_USBACTEP;
 
+	/*
+	 * NAK OUT tokens until a request is queued. An active OUT endpoint
+	 * with NAK clear accepts data into the shared RxFIFO even while it is
+	 * not enabled; in buffer DMA mode nothing takes that packet out of the
+	 * FIFO, so it blocks every other OUT endpoint until this one gets a
+	 * request. dwc2_hsotg_start_req() clears NAK when it arms the endpoint.
+	 */
+	if (!dir_in)
+		epctrl |= DXEPCTL_SNAK;
+
 	/* update the endpoint state */
 	dwc2_hsotg_set_ep_maxpacket(hsotg, hs_ep->index, mps, mc, dir_in);
 
@@ -4129,7 +4139,6 @@ static int dwc2_hsotg_ep_enable(struct usb_ep *ep,
 			mask |= DIEPMSK_NAKMSK;
 			dwc2_writel(hsotg, mask, DIEPMSK);
 		} else {
-			epctrl |= DXEPCTL_SNAK;
 			mask = dwc2_readl(hsotg, DOEPMSK);
 			mask |= DOEPMSK_OUTTKNEPDISMSK;
 			dwc2_writel(hsotg, mask, DOEPMSK);
