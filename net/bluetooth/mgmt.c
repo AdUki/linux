@@ -9434,6 +9434,24 @@ static int add_ext_adv_data_sync(struct hci_dev *hdev, void *data)
 	int err;
 
 	if (ext_adv_capable(hdev)) {
+		struct adv_info *adv;
+		bool bcast;
+
+		/* The parameters were programmed before the data was known.
+		 * If the data carries a Broadcast Audio Announcement, program
+		 * them again, so the set advertises it from the address its PA
+		 * will use.
+		 */
+		hci_dev_lock(hdev);
+		adv = hci_find_adv_instance(hdev, cp->instance);
+		bcast = adv && !adv->periodic &&
+			eir_get_service_data(adv->adv_data, adv->adv_data_len,
+					     EIR_BCAA_SERVICE_UUID, NULL);
+		hci_dev_unlock(hdev);
+
+		if (bcast)
+			return hci_start_ext_adv_sync(hdev, cp->instance);
+
 		err = hci_update_adv_data_sync(hdev, cp->instance);
 		if (err)
 			return err;

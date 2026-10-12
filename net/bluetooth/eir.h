@@ -18,6 +18,9 @@ u8 eir_append_appearance(struct hci_dev *hdev, u8 *ptr, u8 ad_len);
 u8 eir_append_service_data(u8 *eir, u16 eir_len, u16 uuid, u8 *data,
 			   u8 data_len);
 
+/* Broadcast Audio Announcement Service UUID */
+#define EIR_BCAA_SERVICE_UUID	0x1852
+
 static inline u16 eir_precalc_len(u8 data_len)
 {
 	return sizeof(u8) * 2 + data_len;
