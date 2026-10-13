@@ -92,6 +92,14 @@ properties:
       3000ms.
     default: 3000
 
+  cts-event-workaround:
+    description:
+      Clear the interrupt status the way the ST variant needs before
+      acknowledging a CTS change: without it the BCM2835's PL011 can stop
+      transmitting when CTS changes often (a UART Bluetooth controller's
+      flow control).
+    type: boolean
+
   power-domains:
     maxItems: 1
 

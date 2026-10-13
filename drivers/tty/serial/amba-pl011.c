@@ -324,6 +324,7 @@ struct uart_amba_port {
 	unsigned int		old_status;
 	unsigned int		fifosize;	/* vendor-specific */
 	unsigned int		fixed_baud;	/* vendor-set fixed baud rate */
+	bool			cts_event_workaround; /* vendor's, or the DT's */
 	char			type[12];
 	ktime_t			rs485_tx_drain_interval; /* nano */
 	enum pl011_rs485_tx_state	rs485_tx_state;
@@ -1571,6 +1572,11 @@ static bool pl011_tx_char(struct uart_amba_port *uap, unsigned char c,
 		return false; /* unable to transmit character */
 
 	pl011_write(c, uap, REG_DR);
+	/*
+	 * The accessors are relaxed: without a barrier the write may still be on its way when the
+	 * next FIFO status is read, which then says "not full" for a FIFO that is.
+	 */
+	mb();
 	uap->port.icount.tx++;
 
 	return true;
@@ -1601,6 +1607,14 @@ static bool pl011_tx_chars(struct uart_amba_port *uap, bool from_irq)
 		unsigned char c;
 
 		if (likely(from_irq) && count-- == 0)
+			break;
+
+		/*
+		 * From the interrupt the FIFO is taken to be half empty, but a BCM283x now and then
+		 * has it full by the last character of the burst: test before writing that one.
+		 */
+		if (likely(from_irq) && count == 0 &&
+		    pl011_read(uap, REG_FR) & UART01x_FR_TXFF)
 			break;
 
 		if (!kfifo_peek(&tport->xmit_fifo, &c))
@@ -1649,7 +1663,7 @@ static void pl011_modem_status(struct uart_amba_port *uap)
 
 static void check_apply_cts_event_workaround(struct uart_amba_port *uap)
 {
-	if (!uap->vendor->cts_event_workaround)
+	if (!uap->cts_event_workaround)
 		return;
 
 	/* workaround to make sure that all bits are unlocked.. */
@@ -3044,6 +3058,8 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
 
 	uap->reg_offset = vendor->reg_offset;
 	uap->vendor = vendor;
+	uap->cts_event_workaround = vendor->cts_event_workaround ||
+		of_property_read_bool(dev->dev.of_node, "cts-event-workaround");
 	uap->fifosize = vendor->get_fifosize(dev);
 	uap->port.iotype = vendor->access_32b ? UPIO_MEM32 : UPIO_MEM;
 	uap->port.irq = dev->irq[0];
