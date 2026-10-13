@@ -324,6 +324,7 @@ struct uart_amba_port {
 	unsigned int		old_status;
 	unsigned int		fifosize;	/* vendor-specific */
 	unsigned int		fixed_baud;	/* vendor-set fixed baud rate */
+	bool			cts_event_workaround; /* vendor's, or the DT's */
 	char			type[12];
 	ktime_t			rs485_tx_drain_interval; /* nano */
 	enum pl011_rs485_tx_state	rs485_tx_state;
@@ -1662,7 +1663,7 @@ static void pl011_modem_status(struct uart_amba_port *uap)
 
 static void check_apply_cts_event_workaround(struct uart_amba_port *uap)
 {
-	if (!uap->vendor->cts_event_workaround)
+	if (!uap->cts_event_workaround)
 		return;
 
 	/* workaround to make sure that all bits are unlocked.. */
@@ -3057,6 +3058,8 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
 
 	uap->reg_offset = vendor->reg_offset;
 	uap->vendor = vendor;
+	uap->cts_event_workaround = vendor->cts_event_workaround ||
+		of_property_read_bool(dev->dev.of_node, "cts-event-workaround");
 	uap->fifosize = vendor->get_fifosize(dev);
 	uap->port.iotype = vendor->access_32b ? UPIO_MEM32 : UPIO_MEM;
 	uap->port.irq = dev->irq[0];
