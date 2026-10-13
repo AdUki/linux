@@ -1571,6 +1571,11 @@ static bool pl011_tx_char(struct uart_amba_port *uap, unsigned char c,
 		return false; /* unable to transmit character */
 
 	pl011_write(c, uap, REG_DR);
+	/*
+	 * The accessors are relaxed: without a barrier the write may still be on its way when the
+	 * next FIFO status is read, which then says "not full" for a FIFO that is.
+	 */
+	mb();
 	uap->port.icount.tx++;
 
 	return true;
