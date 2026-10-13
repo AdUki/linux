@@ -1608,6 +1608,14 @@ static bool pl011_tx_chars(struct uart_amba_port *uap, bool from_irq)
 		if (likely(from_irq) && count-- == 0)
 			break;
 
+		/*
+		 * From the interrupt the FIFO is taken to be half empty, but a BCM283x now and then
+		 * has it full by the last character of the burst: test before writing that one.
+		 */
+		if (likely(from_irq) && count == 0 &&
+		    pl011_read(uap, REG_FR) & UART01x_FR_TXFF)
+			break;
+
 		if (!kfifo_peek(&tport->xmit_fifo, &c))
 			break;
 
