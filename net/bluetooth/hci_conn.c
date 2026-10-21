@@ -3280,11 +3280,12 @@ int hci_abort_conn(struct hci_conn *conn, u8 reason)
 
 	conn->abort_reason = reason;
 
-	/* Cancel the connect attempt. A return of 0 means the create command
-	 * was still queued and got dequeued, so there is nothing to disconnect.
+	/* Cancel the connect attempt, whether its create command is still
+	 * queued or already waiting for the connection. Either way the
+	 * hci_conn is cleaned up by abort_conn_sync(): a create command that
+	 * got dequeued never reports the attempt as failed.
 	 */
-	if (!hci_cancel_connect_sync(hdev, conn))
-		return 0;
+	hci_cancel_connect_sync(hdev, conn);
 
 	/* Run immediately if on cmd_sync_work since this may be called
 	 * as a result to MGMT_OP_DISCONNECT/MGMT_OP_UNPAIR which does

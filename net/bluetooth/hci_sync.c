@@ -7434,9 +7434,7 @@ static int hci_acl_cancel_create_conn_sync(struct hci_dev *hdev,
 		goto unlock;
 	}
 
-	/* Still queued: a successful dequeue means it never started, so there
-	 * is nothing to disconnect.
-	 */
+	/* Still queued: dequeue it, so that it never starts. */
 	entry = _hci_cmd_sync_lookup_entry(hdev, hci_acl_create_conn_sync, conn,
 					   NULL);
 	if (entry) {
