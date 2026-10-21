@@ -3316,8 +3316,11 @@ static int disconnect_sync(struct hci_dev *hdev, void *data)
 
 	hci_dev_unlock(hdev);
 
+	/* The device was connected when disconnect() checked, so it is gone
+	 * now, for instance after disconnect() aborted the connection attempt.
+	 */
 	if (!conn)
-		return -ENOTCONN;
+		return 0;
 
 	/* Disregard any possible error since the likes of hci_abort_conn_sync
 	 * will clean up the connection no matter the error.
@@ -3378,6 +3381,14 @@ static int disconnect(struct sock *sk, struct hci_dev *hdev, void *data,
 	}
 
 	cmd->cmd_complete = generic_cmd_complete;
+
+	/* The create command of a connection attempt holds hci_cmd_sync until
+	 * the connection completes or times out, so disconnect_sync() would
+	 * only run once there is nothing left to abort. Abort the attempt
+	 * right away instead, disconnect_sync() then replies once it is done.
+	 */
+	if (conn->state == BT_OPEN || conn->state == BT_CONNECT)
+		hci_abort_conn(conn, HCI_ERROR_REMOTE_USER_TERM);
 
 	err = hci_cmd_sync_queue(hdev, disconnect_sync, cmd,
 				 disconnect_complete);
