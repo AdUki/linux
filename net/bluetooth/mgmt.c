@@ -3334,6 +3334,7 @@ static int disconnect(struct sock *sk, struct hci_dev *hdev, void *data,
 	struct mgmt_cp_disconnect *cp = data;
 	struct mgmt_rp_disconnect rp;
 	struct mgmt_pending_cmd *cmd;
+	struct hci_conn *conn;
 	int err;
 
 	bt_dev_dbg(hdev, "sock %p", sk);
@@ -3352,6 +3353,20 @@ static int disconnect(struct sock *sk, struct hci_dev *hdev, void *data,
 	if (!test_bit(HCI_UP, &hdev->flags)) {
 		err = mgmt_cmd_complete(sk, hdev->id, MGMT_OP_DISCONNECT,
 					MGMT_STATUS_NOT_POWERED, &rp,
+					sizeof(rp));
+		goto failed;
+	}
+
+	if (cp->addr.type == BDADDR_BREDR)
+		conn = hci_conn_hash_lookup_ba(hdev, ACL_LINK,
+					       &cp->addr.bdaddr);
+	else
+		conn = hci_conn_hash_lookup_le(hdev, &cp->addr.bdaddr,
+					       le_addr_type(cp->addr.type));
+
+	if (!conn) {
+		err = mgmt_cmd_complete(sk, hdev->id, MGMT_OP_DISCONNECT,
+					MGMT_STATUS_NOT_CONNECTED, &rp,
 					sizeof(rp));
 		goto failed;
 	}
