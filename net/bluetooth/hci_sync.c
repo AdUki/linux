@@ -7051,6 +7051,13 @@ done:
 
 	if (err == -ETIMEDOUT)
 		hci_le_connect_cancel_sync(hdev, conn, 0x00);
+	else if (err == -ECANCELED && conn->abort_reason)
+		/* hci_abort_conn() stopped the wait for the connection, so
+		 * finish the abort before the next command: the Controller
+		 * disallows the LE Create Connection of another device while
+		 * this one is pending.
+		 */
+		hci_abort_conn_sync(hdev, conn, conn->abort_reason);
 
 	/* Re-enable advertising after the connection attempt is finished. */
 	hci_resume_advertising_sync(hdev);
@@ -7341,6 +7348,13 @@ static int hci_acl_create_conn_sync(struct hci_dev *hdev, void *data)
 				       conn->conn_timeout, NULL);
 
 	clear_bit(HCI_CONN_CREATE, &conn->flags);
+
+	/* hci_abort_conn() stopped the wait for the connection, so finish the
+	 * abort before the next command, which may be the Create Connection
+	 * of another device: controllers page one device at a time.
+	 */
+	if (err == -ECANCELED && conn->abort_reason)
+		hci_abort_conn_sync(hdev, conn, conn->abort_reason);
 
 	return err;
 }
