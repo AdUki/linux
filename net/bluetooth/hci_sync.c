@@ -4753,7 +4753,12 @@ static int hci_le_read_def_data_len_sync(struct hci_dev *hdev)
 /* Read LE Number of Supported Advertising Sets */
 static int hci_le_read_num_support_adv_sets_sync(struct hci_dev *hdev)
 {
-	if (!ext_adv_capable(hdev))
+	/* Some controllers report LE Extended Advertising without this
+	 * command. le_num_of_adv_sets then keeps HCI_MAX_ADV_INSTANCES, and a
+	 * set the controller can't allocate fails LE Set Extended Advertising
+	 * Parameters with Memory Capacity Exceeded.
+	 */
+	if (!ext_adv_capable(hdev) || !(hdev->commands[36] & 0x80))
 		return 0;
 
 	return __hci_cmd_sync_status(hdev,
