@@ -3205,6 +3205,60 @@ static int hci_read_enc_key_size(struct hci_dev *hdev, struct hci_conn *conn)
 	return hci_send_cmd(hdev, HCI_OP_READ_ENC_KEY_SIZE, sizeof(cp), &cp);
 }
 
+static int hci_disconnect_cancelled_sync(struct hci_dev *hdev, void *data)
+{
+	u16 handle = PTR_UINT(data) & 0xffff;
+	struct hci_cp_disconnect cp;
+	struct hci_conn *conn;
+
+	/* The cancelled link has no hci_conn, so one with its handle is a
+	 * newer link and the cancelled one is gone already.
+	 */
+	hci_dev_lock(hdev);
+	conn = hci_conn_hash_lookup_handle(hdev, handle);
+	hci_dev_unlock(hdev);
+
+	if (conn)
+		return 0;
+
+	cp.handle = cpu_to_le16(handle);
+	cp.reason = PTR_UINT(data) >> 16;
+
+	return __hci_cmd_sync_status_sk(hdev, HCI_OP_DISCONNECT, sizeof(cp),
+					&cp, HCI_EV_DISCONN_COMPLETE,
+					HCI_CMD_TIMEOUT, NULL);
+}
+
+/* Check if a connection that the controller has just completed is being
+ * cancelled. The cancel then reaches the controller too late, and fails with
+ * Connection Already Exists (BR/EDR) or Command Disallowed (LE), but the
+ * hci_conn is cleaned up as a failed attempt anyway. Disconnect the link by
+ * its handle, as nothing else would.
+ *
+ * This function requires the caller holds hdev->lock
+ */
+static bool hci_conn_cancelled(struct hci_conn *conn, u16 handle)
+{
+	struct hci_dev *hdev = conn->hdev;
+	u8 reason = conn->abort_reason;
+
+	if (!reason) {
+		/* LE Create Connection Cancel on the connection timeout */
+		if (!test_bit(HCI_CONN_CANCEL, &conn->flags))
+			return false;
+
+		reason = HCI_ERROR_REMOTE_USER_TERM;
+	}
+
+	bt_dev_dbg(hdev, "hcon %p handle 0x%4.4x", conn, handle);
+
+	if (handle <= HCI_CONN_HANDLE_MAX)
+		hci_cmd_sync_queue(hdev, hci_disconnect_cancelled_sync,
+				   UINT_PTR(handle | reason << 16), NULL);
+
+	return true;
+}
+
 static void hci_conn_complete_evt(struct hci_dev *hdev, void *data,
 				  struct sk_buff *skb)
 {
@@ -3280,6 +3334,11 @@ static void hci_conn_complete_evt(struct hci_dev *hdev, void *data,
 	}
 
 	if (!status) {
+		if (hci_conn_cancelled(conn, __le16_to_cpu(ev->handle))) {
+			status = conn->abort_reason;
+			goto done;
+		}
+
 		status = hci_conn_set_handle(conn, __le16_to_cpu(ev->handle));
 		if (status)
 			goto done;
@@ -5960,16 +6019,12 @@ static void le_conn_complete_evt(struct hci_dev *hdev, u8 status,
 
 	/* All connection failure handling is taken care of by the
 	 * hci_conn_failed function which is triggered by the HCI
-	 * request completion callbacks used for connecting.
+	 * request completion callbacks used for connecting, or by
+	 * hci_abort_conn_sync() for a connection being aborted.
 	 */
-	if (status || hci_conn_set_handle(conn, handle))
+	if (status || hci_conn_cancelled(conn, handle) ||
+	    hci_conn_set_handle(conn, handle))
 		goto unlock;
-
-	/* Drop the connection if it has been aborted */
-	if (test_bit(HCI_CONN_CANCEL, &conn->flags)) {
-		hci_conn_drop(conn);
-		goto unlock;
-	}
 
 	if (conn->dst_type == ADDR_LE_DEV_PUBLIC)
 		addr_type = BDADDR_LE_PUBLIC;
