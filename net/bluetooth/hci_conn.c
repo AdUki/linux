@@ -1688,13 +1688,16 @@ static int qos_set_bis(struct hci_dev *hdev, struct bt_iso_qos *qos)
 		}
 
 		/* Find an unused adv set to advertise BIS, skip instance 0x00
-		 * since it is reserved as general purpose set.
+		 * since it is reserved as general purpose set. A set is also in
+		 * use if an advertising instance exists for it, e.g. one added
+		 * over MGMT, which must not be turned into the BIG's periodic
+		 * advertising.
 		 */
 		for (bis = 0x01; bis < hdev->le_num_of_adv_sets;
 		     bis++) {
 
 			conn = hci_conn_hash_lookup_bis(hdev, BDADDR_ANY, bis);
-			if (!conn)
+			if (!conn && !hci_find_adv_instance(hdev, bis))
 				break;
 		}
 
