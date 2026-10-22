@@ -1982,7 +1982,15 @@ static int hci_le_create_big(struct hci_conn *conn, struct bt_iso_qos *qos)
 	cp.bis.encryption = qos->bcast.encryption;
 	memcpy(cp.bis.bcode, qos->bcast.bcode, sizeof(cp.bis.bcode));
 
-	return hci_send_cmd(hdev, HCI_OP_LE_CREATE_BIG, sizeof(cp), &cp);
+	/* Wait for LE BIG Complete, so that the cleanup of BISes closed while
+	 * the BIG is being created runs after the BIG exists, and terminates
+	 * it before its periodic advertising is disabled and its advertising
+	 * set removed.
+	 */
+	return __hci_cmd_sync_status_sk(hdev, HCI_OP_LE_CREATE_BIG,
+					sizeof(cp), &cp,
+					HCI_EVT_LE_CREATE_BIG_COMPLETE,
+					conn->conn_timeout, NULL);
 }
 
 static int set_cig_params_sync(struct hci_dev *hdev, void *data)
