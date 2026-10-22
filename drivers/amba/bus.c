@@ -533,7 +533,15 @@ int amba_device_add(struct amba_device *dev, struct resource *parent)
 
 	fwnode_handle_get(dev_fwnode(&dev->dev));
 
+	/*
+	 * A device behind a PCI endpoint (the Raspberry Pi RP1's PL011s,
+	 * described in the device tree under the endpoint's node) lies inside
+	 * a BAR that is already in the resource tree, so requesting it at the
+	 * top level conflicts. Nest it in the resource that contains it.
+	 */
 	ret = request_resource(parent, &dev->res);
+	if (ret)
+		ret = insert_resource(parent, &dev->res);
 	if (ret)
 		return ret;
 
