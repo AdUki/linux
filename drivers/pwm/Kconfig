@@ -637,6 +637,18 @@ config PWM_ROCKCHIP
 	  Generic PWM framework driver for the PWM controller found on
 	  Rockchip SoCs.
 
+config PWM_RP1
+	tristate "Raspberry Pi RP1 PWM support"
+	depends on MISC_RP1 || COMPILE_TEST
+	depends on COMMON_CLK && HAS_IOMEM
+	help
+	  PWM framework driver for the two four-channel PWM controllers of the
+	  Raspberry Pi RP1 I/O controller (Raspberry Pi 5). PWM1 channel 3
+	  drives the Raspberry Pi 5's fan connector.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called pwm-rp1.
+
 config PWM_SAMSUNG
 	tristate "Samsung PWM support"
 	depends on PLAT_SAMSUNG || ARCH_S5PV210 || ARCH_EXYNOS || COMPILE_TEST
