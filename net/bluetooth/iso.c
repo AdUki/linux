@@ -955,6 +955,19 @@ static void iso_sock_disconn(struct sock *sk)
 					 BIS_LINK, BT_OPEN, hcon);
 	}
 
+	/* The BIS is not connected yet (LE BIG Complete or its data path
+	 * still pending): close the socket now. Left in BT_DISCONN it stays
+	 * attached to the iso_conn, and iso_conn_ready() then marks the
+	 * closed socket connected again.
+	 */
+	if (hcon->type == BIS_LINK && sk->sk_state == BT_CONNECT) {
+		if (!test_and_set_bit(ISO_CONN_DROPPED, iso_pi(sk)->conn->flags))
+			hci_conn_drop(hcon);
+		iso_sock_clear_timer(sk);
+		iso_chan_del(sk, ECONNRESET);
+		return;
+	}
+
 	sk->sk_state = BT_DISCONN;
 	if (!test_and_set_bit(ISO_CONN_DROPPED, iso_pi(sk)->conn->flags))
 		hci_conn_drop(iso_pi(sk)->conn->hcon);
