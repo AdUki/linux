@@ -6776,7 +6776,7 @@ static void hci_le_pa_sync_established_evt(struct hci_dev *hdev, void *data,
 					   struct sk_buff *skb)
 {
 	struct hci_ev_le_pa_sync_established *ev = data;
-	int mask = hdev->link_mode;
+	int mask = 0;
 	__u8 flags = 0;
 	struct hci_conn *pa_sync, *conn;
 
