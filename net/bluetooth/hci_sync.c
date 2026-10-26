@@ -1477,8 +1477,15 @@ int hci_setup_ext_adv_instance_sync(struct hci_dev *hdev, u8 instance)
 	 */
 	require_privacy = !connectable && !periodic;
 
+	/* A broadcast source (periodic set) advertises from the identity
+	 * address. Receivers and assistants sync to its PA and BIG by the
+	 * advertiser address they know it by, and with LL privacy the
+	 * controller rotates an RPA on its own: a bonded receiver that knows
+	 * the source by its identity, or any that saw an RPA since rotated,
+	 * can no longer sync.
+	 */
 	err = hci_get_random_address(hdev, require_privacy,
-				     adv_use_rpa(hdev, flags), adv,
+				     adv_use_rpa(hdev, flags) && !periodic, adv,
 				     &own_addr_type, &random_addr);
 	if (err < 0) {
 		if (instance)
