@@ -140,11 +140,17 @@ int read_def_system_config(struct sock *sk, struct hci_dev *hdev, void *data,
 #define TLV_GET_LE16(tlv)	le16_to_cpu(*((__le16 *)(TO_TLV(tlv)->value)))
 #define TLV_GET_U8(tlv)		(*((__u8 *)(TO_TLV(tlv)->value)))
 
+static int page_timeout_sync(struct hci_dev *hdev, void *data)
+{
+	return hci_write_page_timeout_sync(hdev);
+}
+
 int set_def_system_config(struct sock *sk, struct hci_dev *hdev, void *data,
 			  u16 data_len)
 {
 	u16 buffer_left = data_len;
 	u8 *buffer = data;
+	bool page_timeout = false;
 
 	if (buffer_left < sizeof(struct mgmt_tlv)) {
 		return mgmt_cmd_status(sk, hdev->id,
@@ -260,6 +266,7 @@ int set_def_system_config(struct sock *sk, struct hci_dev *hdev, void *data,
 			break;
 		case 0x0007:
 			hdev->def_page_timeout = TLV_GET_LE16(buffer);
+			page_timeout = true;
 			break;
 		case 0x0008:
 			hdev->sniff_min_interval = TLV_GET_LE16(buffer);
@@ -343,6 +350,12 @@ int set_def_system_config(struct sock *sk, struct hci_dev *hdev, void *data,
 		buffer_left -= exp_len;
 		buffer += exp_len;
 	}
+
+	/* A controller powered already has the old page timeout until its next
+	 * reset: it gets the new one now.
+	 */
+	if (page_timeout && hdev_is_powered(hdev))
+		hci_cmd_sync_queue(hdev, page_timeout_sync, NULL, NULL);
 
 	return mgmt_cmd_complete(sk, hdev->id,
 				 MGMT_OP_SET_DEF_SYSTEM_CONFIG, 0, NULL, 0);
