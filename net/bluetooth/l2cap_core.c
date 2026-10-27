@@ -3382,41 +3382,36 @@ static void l2cap_mtu_auto(struct l2cap_chan *chan)
 
 	chan->imtu = L2CAP_DEFAULT_MIN_MTU;
 
-	/* The 2-DH1 packet has between 2 and 56 information bytes
-	 * (including the 2-byte payload header)
+	/* Each EDR packet type below has room for a number of information
+	 * bytes, the 2-byte payload header included. What is left carries
+	 * the whole L2CAP PDU, so the MTU is that less the basic L2CAP
+	 * header: an SDU of the full size would otherwise not fit, and every
+	 * PDU of it would go out as a second ACL fragment of 4 bytes or less.
 	 */
+
+	/* The 2-DH1 packet has between 2 and 56 information bytes */
 	if (!(conn->pkt_type & HCI_2DH1))
-		chan->imtu = 54;
+		chan->imtu = 54 - L2CAP_HDR_SIZE;
 
-	/* The 3-DH1 packet has between 2 and 85 information bytes
-	 * (including the 2-byte payload header)
-	 */
+	/* The 3-DH1 packet has between 2 and 85 information bytes */
 	if (!(conn->pkt_type & HCI_3DH1))
-		chan->imtu = 83;
+		chan->imtu = 83 - L2CAP_HDR_SIZE;
 
-	/* The 2-DH3 packet has between 2 and 369 information bytes
-	 * (including the 2-byte payload header)
-	 */
+	/* The 2-DH3 packet has between 2 and 369 information bytes */
 	if (!(conn->pkt_type & HCI_2DH3))
-		chan->imtu = 367;
+		chan->imtu = 367 - L2CAP_HDR_SIZE;
 
-	/* The 3-DH3 packet has between 2 and 554 information bytes
-	 * (including the 2-byte payload header)
-	 */
+	/* The 3-DH3 packet has between 2 and 554 information bytes */
 	if (!(conn->pkt_type & HCI_3DH3))
-		chan->imtu = 552;
+		chan->imtu = 552 - L2CAP_HDR_SIZE;
 
-	/* The 2-DH5 packet has between 2 and 681 information bytes
-	 * (including the 2-byte payload header)
-	 */
+	/* The 2-DH5 packet has between 2 and 681 information bytes */
 	if (!(conn->pkt_type & HCI_2DH5))
-		chan->imtu = 679;
+		chan->imtu = 679 - L2CAP_HDR_SIZE;
 
-	/* The 3-DH5 packet has between 2 and 1023 information bytes
-	 * (including the 2-byte payload header)
-	 */
+	/* The 3-DH5 packet has between 2 and 1023 information bytes */
 	if (!(conn->pkt_type & HCI_3DH5))
-		chan->imtu = 1021;
+		chan->imtu = 1021 - L2CAP_HDR_SIZE;
 }
 
 static int l2cap_build_conf_req(struct l2cap_chan *chan, void *data, size_t data_size)
