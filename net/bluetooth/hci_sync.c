@@ -3186,16 +3186,15 @@ static int hci_le_set_ext_scan_param_sync(struct hci_dev *hdev, u8 type,
 		}
 	}
 
-	if (scan_1m(hdev) || scan_2m(hdev)) {
+	/* Scan on LE 1M alone, also when LE Coded is in the default PHYs.
+	 * A controller that splits the scan between an LE 1M and an LE Coded
+	 * window can report almost none of the extended advertisements of a
+	 * broadcaster on LE 1M (the Realtek controller of the stream210).
+	 * Connections keep LE Coded in their default PHYs.
+	 */
+	if (scan_1m(hdev) || scan_2m(hdev) || scan_coded(hdev)) {
 		cp->scanning_phys |= LE_SCAN_PHY_1M;
 		hci_le_scan_phy_params(phy, type, interval, window);
-		num_phy++;
-		phy++;
-	}
-
-	if (scan_coded(hdev)) {
-		cp->scanning_phys |= LE_SCAN_PHY_CODED;
-		hci_le_scan_phy_params(phy, type, interval * 3, window * 3);
 		num_phy++;
 		phy++;
 	}
