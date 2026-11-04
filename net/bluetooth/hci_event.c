@@ -4155,6 +4155,36 @@ static void hci_cs_le_create_big(struct hci_dev *hdev, u8 status)
 	bt_dev_dbg(hdev, "status 0x%2.2x", status);
 }
 
+static void hci_cs_le_big_create_sync(struct hci_dev *hdev, u8 status)
+{
+	struct hci_cp_le_big_create_sync *cp;
+	struct hci_conn *conn;
+
+	bt_dev_dbg(hdev, "status 0x%2.2x", status);
+
+	if (!status)
+		return;
+
+	cp = hci_sent_cmd_data(hdev, HCI_OP_LE_BIG_CREATE_SYNC);
+	if (!cp)
+		return;
+
+	hci_dev_lock(hdev);
+
+	/* A refused LE BIG Create Sync is followed by no LE BIG Sync
+	 * Established, so nothing else reports it. Fail the PA sync the
+	 * BIG sync was asked on: its socket would otherwise wait for BISes
+	 * that never come, and BT_SK_BIG_SYNC keeps it from asking again.
+	 */
+	conn = hci_conn_hash_lookup_big_sync_pend(hdev, cp->handle,
+						  cp->num_bis);
+	if (conn && test_and_clear_bit(HCI_CONN_CREATE_BIG_SYNC,
+				       &conn->flags))
+		hci_conn_failed(conn, status);
+
+	hci_dev_unlock(hdev);
+}
+
 static void hci_cs_le_read_all_remote_features(struct hci_dev *hdev, u8 status)
 {
 	struct hci_cp_le_read_remote_features *cp;
@@ -4593,6 +4623,7 @@ static const struct hci_cs {
 	HCI_CS(HCI_OP_LE_EXT_CREATE_CONN, hci_cs_le_ext_create_conn),
 	HCI_CS(HCI_OP_LE_CREATE_CIS, hci_cs_le_create_cis),
 	HCI_CS(HCI_OP_LE_CREATE_BIG, hci_cs_le_create_big),
+	HCI_CS(HCI_OP_LE_BIG_CREATE_SYNC, hci_cs_le_big_create_sync),
 	HCI_CS(HCI_OP_LE_READ_ALL_REMOTE_FEATURES,
 	       hci_cs_le_read_all_remote_features),
 };
